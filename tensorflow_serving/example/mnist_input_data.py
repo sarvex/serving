@@ -53,7 +53,7 @@ def _read32(bytestream):
 
 def extract_images(filename):
   """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
-  print('Extracting %s' % filename)
+  print(f'Extracting {filename}')
   with gzip.open(filename) as bytestream:
     magic = _read32(bytestream)
     if magic != 2051:
@@ -80,7 +80,7 @@ def dense_to_one_hot(labels_dense, num_classes=10):
 
 def extract_labels(filename, one_hot=False):
   """Extract the labels into a 1D uint8 numpy array [index]."""
-  print('Extracting %s' % filename)
+  print(f'Extracting {filename}')
   with gzip.open(filename) as bytestream:
     magic = _read32(bytestream)
     if magic != 2049:
@@ -90,9 +90,7 @@ def extract_labels(filename, one_hot=False):
     num_items = _read32(bytestream)
     buf = bytestream.read(num_items)
     labels = numpy.frombuffer(buf, dtype=numpy.uint8)
-    if one_hot:
-      return dense_to_one_hot(labels)
-    return labels
+    return dense_to_one_hot(labels) if one_hot else labels
 
 
 class DataSet(object):
@@ -105,9 +103,8 @@ class DataSet(object):
       self._num_examples = 10000
       self.one_hot = one_hot
     else:
-      assert images.shape[0] == labels.shape[0], (
-          'images.shape: %s labels.shape: %s' % (images.shape,
-                                                 labels.shape))
+      assert (images.shape[0] == labels.shape[0]
+              ), f'images.shape: {images.shape} labels.shape: {labels.shape}'
       self._num_examples = images.shape[0]
 
       # Convert shape from [num examples, rows, columns, depth]
@@ -143,10 +140,7 @@ class DataSet(object):
     """Return the next `batch_size` examples from this data set."""
     if fake_data:
       fake_image = [1] * 784
-      if self.one_hot:
-        fake_label = [1] + [0] * 9
-      else:
-        fake_label = 0
+      fake_label = [1] + [0] * 9 if self.one_hot else 0
       return [fake_image for _ in range(batch_size)], [
           fake_label for _ in range(batch_size)
       ]

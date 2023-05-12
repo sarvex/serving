@@ -71,8 +71,8 @@ def _generate_tflite_for_parse_example_with_string(export_dir):
     export_dir: The directory to which the flatbuffer should be written.
   """
   with tf.Session(
-      graph=tf.Graph(),
-      config=tf.ConfigProto(log_device_placement=True)) as sess:
+        graph=tf.Graph(),
+        config=tf.ConfigProto(log_device_placement=True)) as sess:
     serialized_tf_example = tf.placeholder(
         tf.string, name="input", shape=[None])
     tf_example = tf.parse_example(serialized_tf_example,
@@ -88,7 +88,7 @@ def _generate_tflite_for_parse_example_with_string(export_dir):
     k = tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY
     tflite_model = signature_def_utils.set_signature_defs(
         tflite_model, {k: predict_signature_def})
-    open(export_dir + "/model.tflite", "wb").write(tflite_model)
+    open(f"{export_dir}/model.tflite", "wb").write(tflite_model)
 
 
 def main(_):

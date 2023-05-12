@@ -64,10 +64,9 @@ def SetVirtualCpus(num_virtual_cpus):
                        for _ in range(num_virtual_cpus)]
     tf.config.experimental.set_virtual_device_configuration(
         physical_devices[0], virtual_devices)
-  else:
-    if len(configs) < num_virtual_cpus:
-      raise RuntimeError('Already configured with %d < %d virtual CPUs' %
-                         (len(configs), num_virtual_cpus))
+  elif len(configs) < num_virtual_cpus:
+    raise RuntimeError('Already configured with %d < %d virtual CPUs' %
+                       (len(configs), num_virtual_cpus))
 
 
 def PickUnusedPort():
@@ -87,7 +86,7 @@ def WaitForServerReady(port):
 
     try:
       # Send empty request to missing model
-      channel = grpc.insecure_channel('localhost:{}'.format(port))
+      channel = grpc.insecure_channel(f'localhost:{port}')
       stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
       stub.Predict(request, RPC_TIMEOUT)
     except grpc.RpcError as error:
@@ -101,16 +100,15 @@ def CallREST(url, req, max_attempts=60):
   """Returns HTTP response body from a REST API call."""
   for attempt in range(max_attempts):
     try:
-      print('Attempt {}: Sending request to {} with data:\n{}'.format(
-          attempt, url, req))
+      print(f'Attempt {attempt}: Sending request to {url} with data:\n{req}')
       json_data = json.dumps(req).encode('utf-8') if req is not None else None
       resp = urllib.request.urlopen(urllib.request.Request(url, data=json_data))
       resp_data = resp.read()
-      print('Received response:\n{}'.format(resp_data))
+      print(f'Received response:\n{resp_data}')
       resp.close()
       return resp_data
     except Exception as e:  # pylint: disable=broad-except
-      print('Failed attempt {}. Error: {}'.format(attempt, e))
+      print(f'Failed attempt {attempt}. Error: {e}')
       if attempt == max_attempts - 1:
         raise
       print('Retrying...')
@@ -185,22 +183,22 @@ class TensorflowModelServerTestBase(tf.test.TestCase):
       return TensorflowModelServerTestBase.model_servers_dict[args_key]
     port = PickUnusedPort()
     rest_api_port = PickUnusedPort()
-    print(('Starting test server on port: {} for model_name: '
-           '{}/model_config_file: {}'.format(port, model_name,
-                                             model_config_file)))
+    print(
+        f'Starting test server on port: {port} for model_name: {model_name}/model_config_file: {model_config_file}'
+    )
     command = os.path.join(
         TensorflowModelServerTestBase.__TestSrcDirPath('model_servers'),
         'tensorflow_model_server')
-    command += ' --port=' + str(port)
-    command += ' --rest_api_port=' + str(rest_api_port)
-    command += ' --rest_api_timeout_in_ms=' + str(HTTP_REST_TIMEOUT_MS)
-    command += ' --grpc_socket_path=' + GRPC_SOCKET_PATH
+    command += f' --port={str(port)}'
+    command += f' --rest_api_port={str(rest_api_port)}'
+    command += f' --rest_api_timeout_in_ms={str(HTTP_REST_TIMEOUT_MS)}'
+    command += f' --grpc_socket_path={GRPC_SOCKET_PATH}'
 
     if model_config_file:
-      command += ' --model_config_file=' + model_config_file
+      command += f' --model_config_file={model_config_file}'
     elif model_path:
-      command += ' --model_name=' + model_name
-      command += ' --model_base_path=' + model_path
+      command += f' --model_name={model_name}'
+      command += f' --model_base_path={model_path}'
     else:
       raise ValueError('Both model_config_file and model_path cannot be empty!')
 
@@ -208,28 +206,23 @@ class TensorflowModelServerTestBase(tf.test.TestCase):
       command += ' --prefer_tflite_model=true'
 
     if monitoring_config_file:
-      command += ' --monitoring_config_file=' + monitoring_config_file
+      command += f' --monitoring_config_file={monitoring_config_file}'
 
     if model_config_file_poll_period is not None:
-      command += ' --model_config_file_poll_wait_seconds=' + str(
-          model_config_file_poll_period)
+      command += f' --model_config_file_poll_wait_seconds={str(model_config_file_poll_period)}'
 
     if batching_parameters_file:
       command += ' --enable_batching'
-      command += ' --batching_parameters_file=' + batching_parameters_file
+      command += f' --batching_parameters_file={batching_parameters_file}'
     if grpc_channel_arguments:
-      command += ' --grpc_channel_arguments=' + grpc_channel_arguments
+      command += f' --grpc_channel_arguments={grpc_channel_arguments}'
     print(command)
     proc = subprocess.Popen(shlex.split(command), stderr=pipe)
     atexit.register(proc.kill)
     print('Server started')
     if wait_for_server_ready:
       WaitForServerReady(port)
-    hostports = (
-        proc,
-        'localhost:' + str(port),
-        'localhost:' + str(rest_api_port),
-    )
+    hostports = proc, f'localhost:{str(port)}', f'localhost:{str(rest_api_port)}'
     TensorflowModelServerTestBase.model_servers_dict[args_key] = hostports
     return hostports
 

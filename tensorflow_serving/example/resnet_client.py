@@ -79,8 +79,9 @@ def main():
     total_time += response.elapsed.total_seconds()
     prediction = response.json()['predictions'][0]
 
-  print('Prediction class: {}, avg latency: {} ms'.format(
-      np.argmax(prediction), (total_time * 1000) / num_requests))
+  print(
+      f'Prediction class: {np.argmax(prediction)}, avg latency: {total_time * 1000 / num_requests} ms'
+  )
 
 
 if __name__ == '__main__':

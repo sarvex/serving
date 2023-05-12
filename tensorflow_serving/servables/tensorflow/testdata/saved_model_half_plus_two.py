@@ -269,13 +269,10 @@ def _generate_saved_model_for_half_plus_two(export_dir,
 
   builder = tf.saved_model.builder.SavedModelBuilder(export_dir)
 
-  device_name = "/cpu:0"
-  if device_type == "gpu":
-    device_name = "/gpu:0"
-
+  device_name = "/gpu:0" if device_type == "gpu" else "/cpu:0"
   with tf.Session(
-      graph=tf.Graph(),
-      config=tf.ConfigProto(log_device_placement=True)) as sess:
+        graph=tf.Graph(),
+        config=tf.ConfigProto(log_device_placement=True)) as sess:
     with tf.device(device_name):
       # Set up the model parameters as variables to exercise variable loading
       # functionality upon restore.
@@ -362,29 +359,28 @@ def _generate_saved_model_for_half_plus_two(export_dir,
     # Initialize all variables and then save the SavedModel.
     sess.run(tf.global_variables_initializer())
 
-    if as_tflite or as_tflite_with_sigdef:
+    if not as_tflite and not as_tflite_with_sigdef and use_main_op:
+      builder.add_meta_graph_and_variables(
+          sess, [tf.saved_model.tag_constants.SERVING],
+          signature_def_map=signature_def_map,
+          assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
+          main_op=tf.group(tf.saved_model.main_op.main_op(),
+                           assign_filename_op))
+    elif not as_tflite and not as_tflite_with_sigdef:
+      builder.add_meta_graph_and_variables(
+          sess, [tf.saved_model.tag_constants.SERVING],
+          signature_def_map=signature_def_map,
+          assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
+          main_op=tf.group(assign_filename_op))
+
+    else:
       converter = tf.lite.TFLiteConverter.from_session(sess, [x], [y])
       tflite_model = converter.convert()
       if as_tflite_with_sigdef:
         k = tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY
         tflite_model = signature_def_utils.set_signature_defs(
             tflite_model, {k: predict_signature_def})
-      open(export_dir + "/model.tflite", "wb").write(tflite_model)
-    else:
-      if use_main_op:
-        builder.add_meta_graph_and_variables(
-            sess, [tf.saved_model.tag_constants.SERVING],
-            signature_def_map=signature_def_map,
-            assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
-            main_op=tf.group(tf.saved_model.main_op.main_op(),
-                             assign_filename_op))
-      else:
-        builder.add_meta_graph_and_variables(
-            sess, [tf.saved_model.tag_constants.SERVING],
-            signature_def_map=signature_def_map,
-            assets_collection=tf.get_collection(tf.GraphKeys.ASSET_FILEPATHS),
-            main_op=tf.group(assign_filename_op))
-
+      open(f"{export_dir}/model.tflite", "wb").write(tflite_model)
   if not as_tflite:
     builder.save(as_text)
 
@@ -401,14 +397,14 @@ def main(_):
   })
 
   _generate_saved_model_for_half_plus_two(
-      "%s_%s" % (FLAGS.output_dir_tf2, FLAGS.device),
+      f"{FLAGS.output_dir_tf2}_{FLAGS.device}",
       tf2=True,
-      device_type=FLAGS.device)
-  print(
-      "SavedModel TF2 generated for %(device)s at: %(dir)s" % {
-          "device": FLAGS.device,
-          "dir": "%s_%s" % (FLAGS.output_dir_tf2, FLAGS.device),
-      })
+      device_type=FLAGS.device,
+  )
+  print(("SavedModel TF2 generated for %(device)s at: %(dir)s" % {
+      "device": FLAGS.device,
+      "dir": f"{FLAGS.output_dir_tf2}_{FLAGS.device}",
+  }))
 
   _generate_saved_model_for_half_plus_two(
       FLAGS.output_dir_pbtxt, as_text=True, device_type=FLAGS.device)
